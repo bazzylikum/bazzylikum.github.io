@@ -1,0 +1,237 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#000000">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black">
+  <meta name="apple-mobile-web-app-title" content="Sport Timer">
+  <title>Sport Timer</title>
+
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="apple-touch-icon" href="icon-192.png">
+
+  <style>
+    :root { color-scheme: dark; }
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0;
+      background: #000;
+      color: #fff;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      -webkit-user-select: none;
+      user-select: none;
+      -webkit-tap-highlight-color: transparent;
+    }
+    body {
+      min-height: 100vh;
+      min-height: 100dvh;
+      display: flex;
+      justify-content: center;
+      padding: max(28px, env(safe-area-inset-top)) 20px max(28px, env(safe-area-inset-bottom));
+    }
+    .wrap {
+      width: 100%;
+      max-width: 560px;
+      display: flex;
+      flex-direction: column;
+      gap: 34px;
+      align-items: stretch;
+    }
+    .label {
+      text-align: center;
+      color: #8a8a8a;
+      font-size: 14px;
+      letter-spacing: .12em;
+      text-transform: uppercase;
+    }
+    .timer {
+      font-variant-numeric: tabular-nums;
+      text-align: center;
+      font-size: clamp(64px, 18vw, 118px);
+      font-weight: 700;
+      letter-spacing: -.05em;
+      line-height: 1;
+      margin-top: 8px;
+    }
+    .controls, .counterControls {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+    }
+    button {
+      appearance: none;
+      border: 0;
+      border-radius: 18px;
+      min-height: 64px;
+      font-size: 20px;
+      font-weight: 600;
+      color: #fff;
+      background: #1c1c1e;
+      touch-action: manipulation;
+    }
+    button:active {
+      transform: scale(.98);
+      background: #2a2a2d;
+    }
+    button:disabled {
+      opacity: .35;
+    }
+    .primary {
+      background: #f2f2f7;
+      color: #000;
+    }
+    .primary:active {
+      background: #d8d8dc;
+    }
+    .counterBox {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      align-items: center;
+      padding-top: 10px;
+      border-top: 1px solid #1d1d1f;
+    }
+    .counter {
+      font-variant-numeric: tabular-nums;
+      font-size: clamp(88px, 26vw, 150px);
+      font-weight: 750;
+      line-height: 1;
+    }
+    .counterControls {
+      width: 100%;
+    }
+    .counterControls button {
+      font-size: 34px;
+      min-height: 72px;
+    }
+    .hint {
+      text-align: center;
+      color: #5f5f64;
+      font-size: 13px;
+      line-height: 1.4;
+    }
+    @media (max-width: 360px) {
+      body { padding-left: 14px; padding-right: 14px; }
+      .wrap { gap: 26px; }
+      button { min-height: 58px; }
+    }
+  </style>
+</head>
+
+<body>
+  <main class="wrap">
+    <section>
+      <div class="label">Stoppuhr</div>
+      <div id="timerDisplay" class="timer">00:00</div>
+    </section>
+
+    <div class="controls">
+      <button id="startPauseBtn" type="button" class="primary">Start</button>
+      <button id="resetBtn" type="button">Reset</button>
+    </div>
+
+    <section class="counterBox">
+      <div class="label">Satz</div>
+      <div id="counterDisplay" class="counter" aria-live="polite">1</div>
+      <div class="counterControls">
+        <button id="minusBtn" type="button" aria-label="Satz verringern">−</button>
+        <button id="plusBtn" type="button" aria-label="Satz erhöhen">+</button>
+      </div>
+    </section>
+
+    <div class="hint">Zählerbereich 1–9</div>
+  </main>
+
+  <script>
+    const timerDisplay = document.getElementById('timerDisplay');
+    const startPauseBtn = document.getElementById('startPauseBtn');
+    const resetBtn = document.getElementById('resetBtn');
+    const counterDisplay = document.getElementById('counterDisplay');
+    const minusBtn = document.getElementById('minusBtn');
+    const plusBtn = document.getElementById('plusBtn');
+
+    let running = false;
+    let startedAt = 0;
+    let accumulatedMs = 0;
+    let rafId = null;
+    let counter = 1;
+
+    function nowMs() {
+      return performance.now();
+    }
+
+    function elapsedMs() {
+      return accumulatedMs + (running ? nowMs() - startedAt : 0);
+    }
+
+    function formatTime(ms) {
+      const totalSeconds = Math.floor(Math.max(0, ms) / 1000);
+      const minutes = Math.floor(totalSeconds / 60);
+      const seconds = totalSeconds % 60;
+      return String(minutes).padStart(2, '0') + ':' + String(seconds).padStart(2, '0');
+    }
+
+    function renderTimer() {
+      timerDisplay.textContent = formatTime(elapsedMs());
+      if (running) rafId = requestAnimationFrame(renderTimer);
+    }
+
+    function start() {
+      if (running) return;
+      running = true;
+      startedAt = nowMs();
+      startPauseBtn.textContent = 'Pause';
+      renderTimer();
+    }
+
+    function pause() {
+      if (!running) return;
+      accumulatedMs += nowMs() - startedAt;
+      running = false;
+      startPauseBtn.textContent = 'Weiter';
+      if (rafId) cancelAnimationFrame(rafId);
+      rafId = null;
+      timerDisplay.textContent = formatTime(accumulatedMs);
+    }
+
+    function reset() {
+      running = false;
+      startedAt = 0;
+      accumulatedMs = 0;
+      if (rafId) cancelAnimationFrame(rafId);
+      rafId = null;
+      timerDisplay.textContent = '00:00';
+      startPauseBtn.textContent = 'Start';
+    }
+
+    function renderCounter() {
+      counter = Math.max(1, Math.min(9, counter));
+      counterDisplay.textContent = String(counter);
+      minusBtn.disabled = counter === 1;
+      plusBtn.disabled = counter === 9;
+    }
+
+    startPauseBtn.addEventListener('click', () => running ? pause() : start());
+    resetBtn.addEventListener('click', reset);
+    minusBtn.addEventListener('click', () => { counter--; renderCounter(); });
+    plusBtn.addEventListener('click', () => { counter++; renderCounter(); });
+
+    document.addEventListener('visibilitychange', () => {
+      if (!document.hidden && running) {
+        if (rafId) cancelAnimationFrame(rafId);
+        renderTimer();
+      }
+    });
+
+    renderCounter();
+
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./sw.js').catch(() => {});
+      });
+    }
+  </script>
+</body>
+</html>
